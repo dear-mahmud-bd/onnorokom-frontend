@@ -24,6 +24,7 @@ import {
   subscribeSession,
 } from "@/lib/auth/session";
 import {
+  normalizeForceAction,
   resolveRoleClaim,
   type ForceAction,
   type JwtClaims,
@@ -106,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveSession({
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
-      forceAction: response.forceAction,
+      forceAction: normalizeForceAction(response.forceAction),
     });
   }, []);
 

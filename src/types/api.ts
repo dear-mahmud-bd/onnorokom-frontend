@@ -1,5 +1,21 @@
 export type ForceAction = "None" | "ChangePassword" | "VerifyEmail";
 
+// The backend serializes enums as integers (no JsonStringEnumConverter), so
+// `forceAction` arrives as 0/1/2 rather than the string names. Normalize at the
+// boundary — tolerate both, so this keeps working if the backend later switches
+// to string enums. Order matches the backend `enum ForceAction`.
+const FORCE_ACTIONS: ForceAction[] = ["None", "ChangePassword", "VerifyEmail"];
+
+export function normalizeForceAction(value: unknown): ForceAction {
+  if (typeof value === "number") {
+    return FORCE_ACTIONS[value] ?? "None";
+  }
+  if (value === "None" || value === "ChangePassword" || value === "VerifyEmail") {
+    return value;
+  }
+  return "None";
+}
+
 export type VerifyEmailOtpStatus = "Verified" | "InvalidCode" | "MaxAttemptsLocked";
 
 export type ChangePasswordStatus =
