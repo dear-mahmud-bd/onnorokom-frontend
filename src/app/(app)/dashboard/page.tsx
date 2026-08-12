@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const isAdmin = user?.role === "Admin";
+  const isTeacher = user?.role === "Teacher";
   const initial = user?.email?.[0]?.toUpperCase() ?? "U";
 
   return (
@@ -63,6 +64,26 @@ export default function DashboardPage() {
                   className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-6 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
                 >
                   Go to admin console
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                    className="h-4 w-4"
+                  >
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ) : null}
+              {isTeacher ? (
+                <Link
+                  href="/teacher"
+                  className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-6 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+                >
+                  Go to teacher console
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"

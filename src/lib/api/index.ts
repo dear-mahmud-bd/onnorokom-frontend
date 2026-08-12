@@ -6,3 +6,6 @@ export * from "./classes";
 export * from "./subjects";
 export * from "./teacherAssignments";
 export * from "./enrollments";
+export * from "./assignments";
+export * from "./submissions";
+export * from "./graphql";
