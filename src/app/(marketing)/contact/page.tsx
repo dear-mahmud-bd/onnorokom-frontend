@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // intentionally uses a static mailto: link instead of stubbing a fake form
 // POST. An interactive contact form would require a backend endpoint.
 
-const SUPPORT_EMAIL = "support@onnorokom.example";
+const SUPPORT_EMAIL = "dearmahmud.bd@gmail.com";
 
 const CHANNELS: {
   title: string;

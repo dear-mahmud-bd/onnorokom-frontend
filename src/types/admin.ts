@@ -35,6 +35,23 @@ export interface CreateUserResponse {
   isActive: boolean;
 }
 
+// Application.Users.Queries.ListUsers.UserSummaryResponse (GET /api/users)
+export interface UserSummaryResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  isEmailVerified: boolean;
+  createdAt: string;
+}
+
+export const USER_ROLE_LABEL: Record<UserRole, string> = {
+  [UserRole.Admin]: "Admin",
+  [UserRole.Teacher]: "Teacher",
+  [UserRole.Student]: "Student",
+};
+
 export interface ClassResponse {
   id: string;
   name: string;

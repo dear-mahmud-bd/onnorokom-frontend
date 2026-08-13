@@ -25,6 +25,18 @@ export function listAssignments(
   );
 }
 
+// GET /api/assignments/mine (Student-only) returns the caller's own Published
+// class assignments — the class-scoped browse list backing the student screen.
+export function listMyAssignments(
+  tokenProvider: TokenProvider = () => null,
+): Promise<AssignmentResponse[]> {
+  return apiFetch<AssignmentResponse[]>(
+    "/api/assignments/mine",
+    { method: "GET" },
+    tokenProvider,
+  );
+}
+
 export function getAssignment(
   id: string,
   tokenProvider: TokenProvider = () => null,

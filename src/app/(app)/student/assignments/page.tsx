@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { searchAssignments } from "@/lib/api/assignments";
+import { listMyAssignments, searchAssignments } from "@/lib/api/assignments";
 import { sessionTokenProvider } from "@/lib/api/token";
 import {
   AssignmentStatus,
   ASSIGNMENT_STATUS_LABEL,
+  type AssignmentResponse,
   type SearchAssignmentHit,
 } from "@/types";
 import { SectionHeader } from "@/components/admin/SectionHeader";
@@ -34,12 +35,26 @@ function StatusBadge({ status }: { status: AssignmentStatus }) {
   );
 }
 
+function TitleLink({ id, title }: { id: string; title: string }) {
+  return (
+    <Link
+      href={`/student/assignments/${id}`}
+      className="font-medium text-accent transition-colors hover:underline"
+    >
+      {title}
+    </Link>
+  );
+}
+
 export default function StudentAssignmentsPage() {
-  // Form inputs (may be edited between pages).
+  // Default class-scoped browse list (GET /api/assignments/mine).
+  const [assignments, setAssignments] = useState<AssignmentResponse[]>([]);
+  const [browseLoading, setBrowseLoading] = useState(true);
+  const [browseError, setBrowseError] = useState<unknown>(null);
+
+  // Search overlay. `searching` switches the view from browse to results.
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  // Snapshot of the query that produced the current results, so paging keeps
-  // using the term/status that was actually searched, not a mid-edit input.
   const [activeSearchText, setActiveSearchText] = useState("");
   const [activeStatus, setActiveStatus] = useState<AssignmentStatus | undefined>(
     undefined,
@@ -47,10 +62,28 @@ export default function StudentAssignmentsPage() {
   const [hits, setHits] = useState<SearchAssignmentHit[]>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [skip, setSkip] = useState(0);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<unknown>(null);
   const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    // browseLoading initializes to true; this effect runs once on mount.
+    let active = true;
+    listMyAssignments(sessionTokenProvider)
+      .then((result) => {
+        if (active) setAssignments(result);
+      })
+      .catch((err) => {
+        if (active) setBrowseError(err);
+      })
+      .finally(() => {
+        if (active) setBrowseLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const runSearch = async (
     term: string,
@@ -58,8 +91,8 @@ export default function StudentAssignmentsPage() {
     nextSkip: number,
   ) => {
     setHint(null);
-    setError(null);
-    setLoading(true);
+    setSearchError(null);
+    setSearchLoading(true);
     try {
       const result = await searchAssignments(
         { searchText: term, status, take: PAGE_SIZE, skip: nextSkip },
@@ -70,11 +103,11 @@ export default function StudentAssignmentsPage() {
       setSkip(result.skip);
       setActiveSearchText(term);
       setActiveStatus(status);
-      setHasSearched(true);
+      setSearching(true);
     } catch (err) {
-      setError(err);
+      setSearchError(err);
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   };
 
@@ -82,18 +115,18 @@ export default function StudentAssignmentsPage() {
     const term = searchText.trim();
     if (!term) {
       // The search endpoint returns nothing without a term — don't round-trip.
-      setHint("Enter a search term to find assignments.");
+      setHint("Enter a search term to filter assignments.");
       return;
     }
     const status =
       statusFilter === ""
         ? undefined
         : (Number(statusFilter) as AssignmentStatus);
-    // A new search always returns to the first page.
     void runSearch(term, status, 0);
   };
 
   const onReset = () => {
+    // Drop back to the default class-scoped browse list.
     setSearchText("");
     setStatusFilter("");
     setActiveSearchText("");
@@ -101,35 +134,31 @@ export default function StudentAssignmentsPage() {
     setHits([]);
     setTotalMatches(0);
     setSkip(0);
-    setHasSearched(false);
+    setSearching(false);
     setHint(null);
-    setError(null);
+    setSearchError(null);
   };
 
   const onPageChange = (nextSkip: number) => {
-    // Re-query the same term/status that produced the current results.
     void runSearch(activeSearchText, activeStatus, nextSkip);
   };
 
-  const columns: DataTableColumn<SearchAssignmentHit>[] = [
+  const browseColumns: DataTableColumn<AssignmentResponse>[] = [
+    { header: "Title", render: (row) => <TitleLink id={row.id} title={row.title} /> },
+    { header: "Status", render: (row) => <StatusBadge status={row.status} /> },
+    { header: "Max marks", render: (row) => row.maxMarks },
     {
-      header: "Title",
-      render: (row) => (
-        <Link
-          href={`/student/assignments/${row.id}`}
-          className="font-medium text-accent transition-colors hover:underline"
-        >
-          {row.title}
-        </Link>
-      ),
+      header: "Deadline",
+      render: (row) => new Date(row.deadline).toLocaleString(),
     },
+  ];
+
+  const searchColumns: DataTableColumn<SearchAssignmentHit>[] = [
+    { header: "Title", render: (row) => <TitleLink id={row.id} title={row.title} /> },
     { header: "Subject", render: (row) => row.subjectName },
     { header: "Class", render: (row) => row.className },
     { header: "Teacher", render: (row) => row.teacherName },
-    {
-      header: "Status",
-      render: (row) => <StatusBadge status={row.status} />,
-    },
+    { header: "Status", render: (row) => <StatusBadge status={row.status} /> },
     {
       header: "Deadline",
       render: (row) => new Date(row.deadline).toLocaleString(),
@@ -140,7 +169,7 @@ export default function StudentAssignmentsPage() {
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Assignments"
-        description="Search published assignments and open one to submit your work."
+        description="Browse the published assignments for your class and open one to submit your work."
       />
 
       <AssignmentSearchBar
@@ -153,9 +182,8 @@ export default function StudentAssignmentsPage() {
       />
 
       <p className="text-xs text-muted">
-        Only published assignments matching your search term are shown. A
-        class-scoped list of all your assignments will arrive with a dedicated
-        endpoint.
+        Showing published assignments for your enrolled class. Use search to
+        filter by keyword across published assignments.
       </p>
 
       {hint ? (
@@ -167,32 +195,39 @@ export default function StudentAssignmentsPage() {
         </div>
       ) : null}
 
-      <ServerErrorBanner error={error} />
+      <ServerErrorBanner error={searching ? searchError : browseError} />
 
-      {loading ? (
-        <p className="text-sm text-muted">Searching…</p>
-      ) : !hasSearched ? (
-        <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center text-sm text-muted">
-          Search for an assignment by keyword to get started.
-        </div>
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            rows={hits}
-            rowKey={(row) => row.id}
-            emptyState="No assignments match your search."
-          />
-          {totalMatches > 0 ? (
-            <SearchPagination
-              take={PAGE_SIZE}
-              skip={skip}
-              hitCount={hits.length}
-              totalMatches={totalMatches}
-              onPageChange={onPageChange}
+      {searching ? (
+        searchLoading ? (
+          <p className="text-sm text-muted">Searching…</p>
+        ) : (
+          <>
+            <DataTable
+              columns={searchColumns}
+              rows={hits}
+              rowKey={(row) => row.id}
+              emptyState="No assignments match your search."
             />
-          ) : null}
-        </>
+            {totalMatches > 0 ? (
+              <SearchPagination
+                take={PAGE_SIZE}
+                skip={skip}
+                hitCount={hits.length}
+                totalMatches={totalMatches}
+                onPageChange={onPageChange}
+              />
+            ) : null}
+          </>
+        )
+      ) : browseLoading ? (
+        <p className="text-sm text-muted">Loading your assignments…</p>
+      ) : (
+        <DataTable
+          columns={browseColumns}
+          rows={assignments}
+          rowKey={(row) => row.id}
+          emptyState="You don't have any published assignments in your class yet."
+        />
       )}
     </div>
   );

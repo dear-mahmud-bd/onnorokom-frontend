@@ -23,7 +23,7 @@ const ROLE_LABELS: Record<number, string> = {
   [UserRole.Student]: "Student",
 };
 
-export function CreateUserForm() {
+export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
   const [serverError, setServerError] = useState<unknown>(null);
 
@@ -42,6 +42,7 @@ export function CreateUserForm() {
       const response = await createUser(values, sessionTokenProvider);
       setCreated(response);
       form.reset();
+      onCreated?.();
     } catch (error) {
       if (isApiError(error) && error.status === 409) {
         form.setError("email", {
