@@ -5,29 +5,39 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { StudentNav } from "@/components/student/StudentNav";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+  onNavigate,
+  showNotifications,
+}: {
+  onNavigate?: () => void;
+  showNotifications?: boolean;
+}) {
   const { user, logout } = useAuth();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   return (
     <div className="flex h-full flex-col gap-6 p-4">
-      <Link
-        href="/student"
-        onClick={onNavigate}
-        className="flex items-center gap-3 px-2 py-1"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-base font-semibold text-accent-foreground">
-          O
-        </span>
-        <span className="flex flex-col leading-tight">
-          <span className="font-display text-base font-semibold text-foreground">
-            Onnorokom
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href="/student"
+          onClick={onNavigate}
+          className="flex items-center gap-3 px-2 py-1"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-base font-semibold text-accent-foreground">
+            O
           </span>
-          <span className="text-xs text-muted">Student console</span>
-        </span>
-      </Link>
+          <span className="flex flex-col leading-tight">
+            <span className="font-display text-base font-semibold text-foreground">
+              Onnorokom
+            </span>
+            <span className="text-xs text-muted">Student console</span>
+          </span>
+        </Link>
+        {showNotifications ? <NotificationBell align="left" /> : null}
+      </div>
 
       <StudentNav onNavigate={onNavigate} />
 
@@ -104,7 +114,7 @@ export function StudentShell({ children }: { children: ReactNode }) {
     <div className="min-h-full bg-background lg:grid lg:grid-cols-[16rem_1fr]">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen border-r border-border bg-surface lg:block">
-        <SidebarContent />
+        <SidebarContent showNotifications />
       </aside>
 
       {/* Mobile top bar */}
@@ -117,24 +127,27 @@ export function StudentShell({ children }: { children: ReactNode }) {
             Student console
           </span>
         </Link>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open navigation"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden
-            className="h-5 w-5"
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
           >
-            <path d="M3 12h18M3 6h18M3 18h18" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden
+              className="h-5 w-5"
+            >
+              <path d="M3 12h18M3 6h18M3 18h18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
