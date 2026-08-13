@@ -5,6 +5,7 @@ import { listUsers, setUserActive } from "@/lib/api/users";
 import { sessionTokenProvider } from "@/lib/api/token";
 import {
   USER_ROLE_LABEL,
+  UserRole,
   type UserSummaryResponse,
 } from "@/types";
 import { SectionHeader } from "@/components/admin/SectionHeader";
@@ -84,13 +85,20 @@ export default function AdminUsersPage() {
       className: "text-right",
       render: (row) =>
         row.isActive ? (
-          <button
-            type="button"
-            onClick={() => setPendingDeactivate(row)}
-            className="text-sm font-medium text-red-600 transition-colors hover:underline dark:text-red-400"
-          >
-            Deactivate
-          </button>
+          // Business rule: Admin accounts cannot be deactivated (neither your
+          // own nor another Admin's). The backend enforces this too, returning
+          // CannotDeactivateSelf / CannotDeactivateAdmin.
+          row.role === UserRole.Admin ? (
+            <span className="text-sm text-muted">—</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPendingDeactivate(row)}
+              className="text-sm font-medium text-red-600 transition-colors hover:underline dark:text-red-400"
+            >
+              Deactivate
+            </button>
+          )
         ) : (
           <button
             type="button"

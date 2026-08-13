@@ -12,6 +12,7 @@ interface AdminFieldBaseProps {
   name: string;
   label: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 interface AdminInputFieldProps extends AdminFieldBaseProps {
@@ -29,7 +30,7 @@ interface AdminSelectFieldProps extends AdminFieldBaseProps {
 type AdminFieldProps = AdminInputFieldProps | AdminSelectFieldProps;
 
 const controlClassName =
-  "rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none transition-colors placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/20";
+  "rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none transition-colors placeholder:text-muted/70 focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function AdminField(props: AdminFieldProps) {
   const { name, label, placeholder } = props;
@@ -59,6 +60,7 @@ export function AdminField(props: AdminFieldProps) {
           id={name}
           aria-invalid={errorMessage ? true : undefined}
           aria-describedby={describedBy}
+          disabled={props.disabled}
           className={controlClassName}
           {...register(name, { valueAsNumber: props.valueAsNumber })}
         >
@@ -79,6 +81,7 @@ export function AdminField(props: AdminFieldProps) {
           type={props.type ?? "text"}
           autoComplete={props.autoComplete}
           placeholder={placeholder}
+          disabled={props.disabled}
           aria-invalid={errorMessage ? true : undefined}
           aria-describedby={describedBy}
           className={controlClassName}

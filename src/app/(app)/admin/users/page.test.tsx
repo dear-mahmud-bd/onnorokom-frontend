@@ -74,6 +74,24 @@ describe("AdminUsersPage", () => {
     expect(await screen.findByText("Inactive")).toBeInTheDocument();
   });
 
+  it("does not offer Deactivate for Admin accounts", async () => {
+    mockList.mockResolvedValue([
+      user({
+        id: "admin1",
+        fullName: "Root Admin",
+        email: "admin@demo.local",
+        role: UserRole.Admin,
+      }),
+    ]);
+
+    render(<AdminUsersPage />);
+    await screen.findByText("admin@demo.local");
+
+    expect(
+      screen.queryByRole("button", { name: "Deactivate" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when there are no users", async () => {
     mockList.mockResolvedValue([]);
 

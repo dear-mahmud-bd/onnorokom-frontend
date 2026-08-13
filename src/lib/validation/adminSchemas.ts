@@ -27,13 +27,17 @@ export const subjectSchema = z.object({
   code: z.string().min(1, { message: "Subject code is required" }),
 });
 
+// IDs come from the backend as generic GUIDs (e.g. seeded values like
+// 11111111-1111-...), which are NOT valid RFC-4122 UUIDs. zod v4's `z.uuid()`
+// is strict about the version/variant nibbles and would reject them, so use
+// `z.guid()` which only checks the 8-4-4-4-12 hex GUID shape.
 export const teacherAssignmentSchema = z.object({
-  teacherId: z.uuid({ message: "Select a teacher" }),
-  subjectId: z.uuid({ message: "Select a subject" }),
-  classId: z.uuid({ message: "Select a class" }),
+  teacherId: z.guid({ message: "Select a teacher" }),
+  subjectId: z.guid({ message: "Select a subject" }),
+  classId: z.guid({ message: "Select a class" }),
 });
 
 export const enrollmentSchema = z.object({
-  studentId: z.uuid({ message: "Select a student" }),
-  classId: z.uuid({ message: "Select a class" }),
+  studentId: z.guid({ message: "Select a student" }),
+  classId: z.guid({ message: "Select a class" }),
 });
