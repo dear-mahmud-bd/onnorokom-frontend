@@ -1,4 +1,5 @@
 import type { ApiErrorBody } from "@/types";
+import { attemptTokenRefresh } from "./refresh";
 
 export type TokenProvider = () => string | null;
 
@@ -83,10 +84,19 @@ async function parseSuccessBody<TResponse>(response: Response): Promise<TRespons
   return JSON.parse(text) as TResponse;
 }
 
+// The auth endpoints must not trigger a token refresh: a 401 from login means
+// bad credentials, and refresh is what does the renewing in the first place.
+function isAuthEndpoint(path: string): boolean {
+  return (
+    path.startsWith("/api/auth/login") || path.startsWith("/api/auth/refresh")
+  );
+}
+
 async function request<TResponse>(
   path: string,
   init: FetchOptions,
   tokenProvider: TokenProvider,
+  allowRefresh = true,
 ): Promise<TResponse> {
   const headers = buildHeaders(init, tokenProvider);
 
@@ -107,6 +117,18 @@ async function request<TResponse>(
       },
       true,
     );
+  }
+
+  // Access token likely expired: renew it once with the refresh token and retry.
+  // If the refresh token is also expired, attemptTokenRefresh clears the session
+  // (logging the user out) and returns false, so the 401 falls through below.
+  if (
+    response.status === 401 &&
+    allowRefresh &&
+    !isAuthEndpoint(path) &&
+    (await attemptTokenRefresh())
+  ) {
+    return request<TResponse>(path, init, tokenProvider, false);
   }
 
   if (!response.ok) {

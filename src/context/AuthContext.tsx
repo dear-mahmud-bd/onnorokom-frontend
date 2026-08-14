@@ -5,17 +5,16 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useRef,
   useSyncExternalStore,
 } from "react";
 import type { ReactNode } from "react";
 import {
   changePassword as changePasswordEndpoint,
   login as loginEndpoint,
-  refresh as refreshEndpoint,
   verifyEmail as verifyEmailEndpoint,
 } from "@/lib/api/auth";
-import { isApiError, type TokenProvider } from "@/lib/api/client";
+import { type TokenProvider } from "@/lib/api/client";
+import { attemptTokenRefresh } from "@/lib/api/refresh";
 import {
   clearSession,
   decodeJwt,
@@ -125,40 +124,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
   }, []);
 
+  // Delegates to the shared coordinator (also used by the API client's
+  // refresh-on-401 path) so there is a single refresh implementation. It clears
+  // the session on an expired refresh token; surface a failure to callers.
   const doRefresh = useCallback(async () => {
-    const current = getSessionSnapshot();
-    if (!current) {
-      throw new Error("No session to refresh");
+    const ok = await attemptTokenRefresh();
+    if (!ok) {
+      throw new Error("Session refresh failed");
     }
-
-    try {
-      const response = await refreshEndpoint(current.refreshToken);
-      saveSession({
-        accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
-        forceAction: current.forceAction,
-      });
-    } catch (error) {
-      if (isApiError(error) && error.status === 401) {
-        doLogout();
-      }
-      throw error;
-    }
-  }, [doLogout]);
+  }, []);
 
   const refresh = useCallback(async () => {
     await doRefresh();
   }, [doRefresh]);
 
-  const refreshPromiseRef = useRef<Promise<void> | null>(null);
-
+  // attemptTokenRefresh already de-dupes concurrent refreshes internally.
   const refreshSession = useCallback(async () => {
-    if (!refreshPromiseRef.current) {
-      refreshPromiseRef.current = doRefresh().finally(() => {
-        refreshPromiseRef.current = null;
-      });
-    }
-    return refreshPromiseRef.current;
+    await doRefresh();
   }, [doRefresh]);
 
   const verifyEmail = useCallback(
