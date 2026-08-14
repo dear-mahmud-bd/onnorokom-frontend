@@ -25,6 +25,7 @@ const ROLE_LABELS: Record<number, string> = {
 
 export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
+  // console.log("CreateUserForm rendered", created); // Debugging log to check re-renders
   const [serverError, setServerError] = useState<unknown>(null);
 
   const form = useForm<CreateUserInput>({
@@ -77,6 +78,8 @@ export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
             <dd>{created.email}</dd>
             <dt className="font-medium">Role</dt>
             <dd>{ROLE_LABELS[created.role] ?? created.role}</dd>
+            <dt className="font-medium">Password</dt>
+            <dd>{created.tempPassword}</dd>
             <dt className="font-medium">Must change password</dt>
             <dd>{created.mustChangePassword ? "Yes" : "No"}</dd>
             <dt className="font-medium">Email verified</dt>

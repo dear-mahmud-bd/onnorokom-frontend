@@ -9,6 +9,13 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  // "danger" (default) styles the confirm button red for destructive actions;
+  // "primary" uses the accent color for non-destructive ones (e.g. publish).
+  tone?: "danger" | "primary";
+  // While busy, both buttons are disabled and the confirm button shows busyLabel
+  // (falls back to confirmLabel) — used to signal an in-flight async action.
+  busy?: boolean;
+  busyLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +26,9 @@ export function ConfirmDialog({
   message,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
+  tone = "danger",
+  busy = false,
+  busyLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -54,16 +64,22 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted"
+            disabled={busy}
+            className="flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="flex h-10 items-center justify-center rounded-full bg-red-600 px-4 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            disabled={busy}
+            className={`flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 ${
+              tone === "primary"
+                ? "bg-accent text-accent-foreground"
+                : "bg-red-600 text-white"
+            }`}
           >
-            {confirmLabel}
+            {busy ? (busyLabel ?? confirmLabel) : confirmLabel}
           </button>
         </div>
       </div>

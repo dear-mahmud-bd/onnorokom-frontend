@@ -50,11 +50,13 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
 
   const toggle = () => {
-    setOpen((prev) => {
-      const next = !prev;
-      if (next) markAllRead();
-      return next;
-    });
+    // Compute next state in the handler, not inside the setOpen updater: calling
+    // markAllRead() (a setState on NotificationsProvider) from within an updater
+    // triggers React's "Cannot update a component while rendering a different
+    // component" warning. Updaters must stay pure.
+    const next = !open;
+    setOpen(next);
+    if (next) markAllRead();
   };
 
   const close = () => setOpen(false);

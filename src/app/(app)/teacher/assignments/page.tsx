@@ -9,7 +9,11 @@ import {
   publishAssignment,
   updateAssignment,
 } from "@/lib/api/assignments";
-import { teacherClasses, teacherSubjects } from "@/lib/api/graphql";
+import {
+  teacherClasses,
+  teacherSubjects,
+  teacherTeachingAssignments,
+} from "@/lib/api/graphql";
 import { sessionTokenProvider } from "@/lib/api/token";
 import { isApiError } from "@/lib/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -20,6 +24,7 @@ import {
   type AssignmentResponse,
   type ClassResponse,
   type SubjectResponse,
+  type TeacherSubjectClassAssignmentResponse,
 } from "@/types";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
@@ -55,6 +60,9 @@ export default function TeacherAssignmentsPage() {
 
   const [classes, setClasses] = useState<ClassResponse[]>([]);
   const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
+  const [teaching, setTeaching] = useState<
+    TeacherSubjectClassAssignmentResponse[]
+  >([]);
   const [classId, setClassId] = useState("");
   const [rows, setRows] = useState<AssignmentResponse[]>([]);
 
@@ -67,6 +75,10 @@ export default function TeacherAssignmentsPage() {
   const [deleteTarget, setDeleteTarget] = useState<AssignmentResponse | null>(
     null,
   );
+  const [publishTarget, setPublishTarget] = useState<AssignmentResponse | null>(
+    null,
+  );
+  const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const subjectById = useMemo(
@@ -83,20 +95,23 @@ export default function TeacherAssignmentsPage() {
     [],
   );
 
-  // Load the reference data (classes + subjects) once via GraphQL — the only
-  // teacher-reachable source, since REST /api/classes and /api/subjects are
-  // Admin-only.
+  // Load the reference data (classes + subjects) plus the teacher's own
+  // admin-assigned subject–class pairs, all via GraphQL — the only
+  // teacher-reachable source, since REST /api/classes, /api/subjects and
+  // /api/teacher-subject-class are Admin-only.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [classList, subjectList] = await Promise.all([
+        const [classList, subjectList, teachingList] = await Promise.all([
           teacherClasses(sessionTokenProvider),
           teacherSubjects(sessionTokenProvider),
+          teacherTeachingAssignments(sessionTokenProvider),
         ]);
         if (active) {
           setClasses(classList);
           setSubjects(subjectList);
+          setTeaching(teachingList);
         }
       } catch (error) {
         if (active) {
@@ -112,6 +127,27 @@ export default function TeacherAssignmentsPage() {
       active = false;
     };
   }, []);
+
+  // Bound the class picker to the classes the admin assigned this teacher, and
+  // (per selected class) the subjects they may create assignments for. This
+  // mirrors the backend's NotTeachingSubjectClass guard so the UI never offers
+  // a class/subject the server would reject.
+  const assignedClasses = useMemo(() => {
+    const classIds = new Set(teaching.map((t) => t.classId));
+    return classes.filter((c) => classIds.has(c.id));
+  }, [classes, teaching]);
+
+  const subjectsForClass = useMemo(() => {
+    if (!classId) {
+      return [] as SubjectResponse[];
+    }
+    const subjectIds = new Set(
+      teaching.filter((t) => t.classId === classId).map((t) => t.subjectId),
+    );
+    return subjects.filter((s) => subjectIds.has(s.id));
+  }, [subjects, teaching, classId]);
+
+  const hasAssignedClasses = assignedClasses.length > 0;
 
   const loadAssignments = useCallback(
     async (cid: string) => {
@@ -193,11 +229,21 @@ export default function TeacherAssignmentsPage() {
     }
   };
 
-  const handlePublish = async (row: AssignmentResponse) => {
+  const handlePublish = async () => {
+    if (!publishTarget) {
+      return;
+    }
     setActionError(null);
+    setPublishing(true);
     try {
-      await publishAssignment(row.id, sessionTokenProvider);
-      await refresh();
+      // The publish endpoint returns the updated assignment (now Published), so
+      // swap it into the list in place — no full refetch needed to reflect the
+      // new status.
+      const updated = await publishAssignment(
+        publishTarget.id,
+        sessionTokenProvider,
+      );
+      setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     } catch (error) {
       if (isApiError(error)) {
         if (error.status === 409 && error.problem.errorCode === "NotDraft") {
@@ -214,6 +260,9 @@ export default function TeacherAssignmentsPage() {
         }
       }
       setActionError("Could not publish the assignment. Please try again.");
+    } finally {
+      setPublishing(false);
+      setPublishTarget(null);
     }
   };
 
@@ -253,7 +302,7 @@ export default function TeacherAssignmentsPage() {
           {row.status === AssignmentStatus.Draft ? (
             <button
               type="button"
-              onClick={() => handlePublish(row)}
+              onClick={() => setPublishTarget(row)}
               className="rounded-full px-3 py-1 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
             >
               Publish
@@ -299,30 +348,43 @@ export default function TeacherAssignmentsPage() {
 
       <ServerErrorBanner error={loadError} />
 
-      <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="class-select"
-          className="text-sm font-medium text-foreground"
+      {!refLoading && !hasAssignedClasses ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
         >
-          Class
-        </label>
-        <select
-          id="class-select"
-          value={classId}
-          disabled={refLoading}
-          onChange={(e) => handleSelectClass(e.target.value)}
-          className="max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
-        >
-          <option value="" disabled>
-            {refLoading ? "Loading classes…" : "Select a class"}
-          </option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {classLabel(c)}
+          <span className="font-medium">No classes assigned yet</span>
+          <span>
+            The admin has not assigned you to any subject–class yet, so there is
+            nothing to create assignments for. Please contact your admin.
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="class-select"
+            className="text-sm font-medium text-foreground"
+          >
+            Class
+          </label>
+          <select
+            id="class-select"
+            value={classId}
+            disabled={refLoading}
+            onChange={(e) => handleSelectClass(e.target.value)}
+            className="max-w-sm rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
+          >
+            <option value="" disabled>
+              {refLoading ? "Loading classes…" : "Select a class"}
             </option>
-          ))}
-        </select>
-      </div>
+            {assignedClasses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {classLabel(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {actionError ? (
         <div
@@ -335,7 +397,7 @@ export default function TeacherAssignmentsPage() {
 
       <ServerErrorBanner error={listError} />
 
-      {!classId ? (
+      {!hasAssignedClasses ? null : !classId ? (
         <p className="text-sm text-muted">
           Select a class to see its assignments.
         </p>
@@ -356,7 +418,7 @@ export default function TeacherAssignmentsPage() {
           initialValue={dialog.target}
           classId={selectedClass.id}
           className={classLabel(selectedClass)}
-          subjects={subjects}
+          subjects={subjectsForClass}
           onSubmit={handleSubmit}
           onCancel={() => setDialog(null)}
         />
@@ -368,6 +430,22 @@ export default function TeacherAssignmentsPage() {
         message={`Delete "${deleteTarget?.title ?? ""}"? This cannot be undone.`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={publishTarget !== null}
+        tone="primary"
+        confirmLabel="Publish"
+        busy={publishing}
+        busyLabel="Publishing…"
+        title="Publish assignment"
+        message={`Publish "${publishTarget?.title ?? ""}"? Students in this class will be able to see it and submit.`}
+        onConfirm={handlePublish}
+        onCancel={() => {
+          if (!publishing) {
+            setPublishTarget(null);
+          }
+        }}
       />
     </div>
   );

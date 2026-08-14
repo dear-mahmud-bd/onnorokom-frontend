@@ -17,8 +17,13 @@ export const assignmentSchema = z.object({
     .max(DESCRIPTION_MAX_LENGTH, {
       message: `Description must be at most ${DESCRIPTION_MAX_LENGTH} characters long`,
     }),
-  subjectId: z.uuid({ message: "Select a subject" }),
-  classId: z.uuid({ message: "Select a class" }),
+  // IDs come from the backend as generic GUIDs (e.g. seeded values like
+  // 55555555-5555-...), which are NOT valid RFC-4122 UUIDs. zod v4's `z.uuid()`
+  // is strict about the version/variant nibbles and would reject them (leaving
+  // "Select a subject" showing even after a real selection), so use `z.guid()`
+  // which only checks the 8-4-4-4-12 hex GUID shape.
+  subjectId: z.guid({ message: "Select a subject" }),
+  classId: z.guid({ message: "Select a class" }),
   deadline: z
     .string()
     .min(1, { message: "Deadline is required" })

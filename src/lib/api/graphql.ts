@@ -14,6 +14,7 @@ import {
   type AssignmentResponse,
   type ClassResponse,
   type SubjectResponse,
+  type TeacherSubjectClassAssignmentResponse,
 } from "@/types";
 import { ApiError, apiFetch, type TokenProvider } from "./client";
 
@@ -104,6 +105,32 @@ export async function teacherSubjects(
     tokenProvider,
   );
   return data.subjects;
+}
+
+// The subject–class pairs the admin assigned to the signed-in teacher. REST
+// /api/teacher-subject-class is Admin-only; the `myTeachingAssignments` query
+// is scoped to the current user, so this is the teacher's path to their own
+// teaching permissions (used to bound which classes/subjects they can create
+// assignments for).
+const MY_TEACHING_ASSIGNMENTS_QUERY = `
+  query MyTeachingAssignments {
+    myTeachingAssignments {
+      id
+      teacherId
+      subjectId
+      classId
+      createdAt
+    }
+  }
+`;
+
+export async function teacherTeachingAssignments(
+  tokenProvider: TokenProvider = () => null,
+): Promise<TeacherSubjectClassAssignmentResponse[]> {
+  const data = await graphqlRequest<{
+    myTeachingAssignments: TeacherSubjectClassAssignmentResponse[];
+  }>(MY_TEACHING_ASSIGNMENTS_QUERY, {}, tokenProvider);
+  return data.myTeachingAssignments;
 }
 
 // Full assignment detail for the student flow. REST GET /api/assignments/{id}

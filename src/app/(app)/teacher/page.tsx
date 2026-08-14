@@ -1,4 +1,11 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { teacherTeachingAssignments } from "@/lib/api/graphql";
+import { sessionTokenProvider } from "@/lib/api/token";
+import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
+import type { TeacherSubjectClassAssignmentResponse } from "@/types";
 
 const STEPS: { title: string; description: string }[] = [
   {
@@ -19,6 +26,44 @@ const STEPS: { title: string; description: string }[] = [
 ];
 
 export default function TeacherOverviewPage() {
+  const [teaching, setTeaching] = useState<
+    TeacherSubjectClassAssignmentResponse[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const rows = await teacherTeachingAssignments(sessionTokenProvider);
+        if (active) {
+          setTeaching(rows);
+        }
+      } catch (error) {
+        if (active) {
+          setLoadError(error);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // The admin assigns subject–class pairs; a class may host more than one of
+  // the teacher's subjects, so count distinct classes for the headline stat.
+  const classCount = useMemo(
+    () => new Set(teaching.map((t) => t.classId)).size,
+    [teaching],
+  );
+  const subjectPairCount = teaching.length;
+  const hasAssignments = classCount > 0;
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -33,6 +78,48 @@ export default function TeacherOverviewPage() {
           the submissions your students turn in.
         </p>
       </header>
+
+      <ServerErrorBanner error={loadError} />
+
+      {loading ? (
+        <p className="text-sm text-muted">Loading your classes…</p>
+      ) : hasAssignments ? (
+        <section
+          aria-label="Your teaching assignments"
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          <div className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-5">
+            <span className="font-display text-3xl font-semibold text-foreground">
+              {classCount}
+            </span>
+            <span className="text-sm text-muted">
+              {classCount === 1 ? "class" : "classes"} assigned to you by the
+              admin
+            </span>
+          </div>
+          <div className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-5">
+            <span className="font-display text-3xl font-semibold text-foreground">
+              {subjectPairCount}
+            </span>
+            <span className="text-sm text-muted">
+              subject–class {subjectPairCount === 1 ? "pair" : "pairs"} you can
+              create assignments for
+            </span>
+          </div>
+        </section>
+      ) : (
+        <div
+          role="alert"
+          className="flex flex-col gap-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+        >
+          <span className="font-medium">No classes assigned yet</span>
+          <span>
+            The admin has not assigned you to any subject–class yet. Once a class
+            is assigned, it will appear here and you can start creating
+            assignments. Please contact your admin.
+          </span>
+        </div>
+      )}
 
       <section aria-label="How it works" className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
