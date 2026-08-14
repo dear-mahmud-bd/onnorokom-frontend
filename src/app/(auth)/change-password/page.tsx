@@ -10,6 +10,7 @@ import {
   changePasswordSchema,
   type ChangePasswordInput,
 } from "@/lib/validation";
+import { normalizeChangePasswordStatus } from "@/types";
 import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
 import { FormTextInput } from "@/components/auth/FormTextInput";
 import { SubmitButton } from "@/components/auth/SubmitButton";
@@ -63,10 +64,14 @@ export default function ChangePasswordPage() {
         await changePassword(currentPassword, newPassword);
         setSucceeded(true);
         logout();
+        // The success toast is fired on the login screen (see NoticeToaster);
+        // firing it here would race the logout + redirect and get dropped.
         router.replace("/login?notice=password-changed");
       } catch (error) {
         const problemStatus = isApiError(error)
-          ? (error.problem as unknown as { status?: string }).status
+          ? normalizeChangePasswordStatus(
+              (error.problem as { status?: unknown }).status,
+            )
           : undefined;
 
         if (

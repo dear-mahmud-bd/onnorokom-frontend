@@ -24,7 +24,9 @@ import {
   subscribeSession,
 } from "@/lib/auth/session";
 import {
+  normalizeChangePasswordStatus,
   normalizeForceAction,
+  normalizeVerifyEmailOtpStatus,
   resolveRoleClaim,
   type ForceAction,
   type JwtClaims,
@@ -50,7 +52,7 @@ interface AuthContextValue {
   logout: () => void;
   refresh: () => Promise<void>;
   refreshSession: () => Promise<void>;
-  verifyEmail: (code: string) => Promise<void>;
+  verifyEmail: (code: string) => Promise<ForceAction>;
   changePassword: (
     currentPassword: string,
     newPassword: string,
@@ -152,14 +154,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [doRefresh]);
 
   const verifyEmail = useCallback(
-    async (code: string) => {
+    async (code: string): Promise<ForceAction> => {
       const response = await verifyEmailEndpoint(code, tokenProvider);
-      if (response.status === "Verified") {
+      if (normalizeVerifyEmailOtpStatus(response.status) === "Verified") {
         const current = getSessionSnapshot();
         if (current) {
-          saveSession({ ...current, forceAction: "None" });
+          // The backend tells us what's still owed after verifying: admin-created
+          // accounts route on to ChangePassword, everyone else clears to None.
+          const next = normalizeForceAction(response.nextAction);
+          saveSession({ ...current, forceAction: next });
+          return next;
         }
       }
+      return getSessionSnapshot()?.forceAction ?? "None";
     },
     [tokenProvider],
   );
@@ -171,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         newPassword,
         tokenProvider,
       );
-      if (response.status === "Verified") {
+      if (normalizeChangePasswordStatus(response.status) === "Verified") {
         const current = getSessionSnapshot();
         if (current) {
           saveSession({ ...current, forceAction: "None" });

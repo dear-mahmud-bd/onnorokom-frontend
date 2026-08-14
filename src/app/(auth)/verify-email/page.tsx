@@ -11,6 +11,7 @@ import {
   verifyEmailSchema,
   type VerifyEmailOtpInput,
 } from "@/lib/validation";
+import { normalizeVerifyEmailOtpStatus } from "@/types";
 import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
 import { FormTextInput } from "@/components/auth/FormTextInput";
 import { SubmitButton } from "@/components/auth/SubmitButton";
@@ -40,10 +41,21 @@ export default function VerifyEmailPage() {
     setInvalidCode(false);
     setAuthError(null);
     try {
-      await verifyEmail(code);
+      const nextAction = await verifyEmail(code);
+      // Admin-created accounts still owe a password change after verifying their
+      // email; send them there. Everyone else is now fully set up. The success
+      // toast is fired on the destination page (see NoticeToaster) so it isn't
+      // dropped by the redirect.
+      router.replace(
+        nextAction === "ChangePassword"
+          ? "/change-password?notice=email-verified"
+          : "/dashboard?notice=account-ready",
+      );
     } catch (error) {
       const problemStatus = isApiError(error)
-        ? (error.problem as unknown as { status?: string }).status
+        ? normalizeVerifyEmailOtpStatus(
+            (error.problem as { status?: unknown }).status,
+          )
         : undefined;
 
       if (isApiError(error) && error.status === 400 && problemStatus === "InvalidCode") {

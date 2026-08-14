@@ -47,7 +47,7 @@ export function Navbar() {
   const authed = status === "authenticated";
   const authAction = authed
     ? { href: "/dashboard", label: "Dashboard" }
-    : { href: "/login", label: "Log in" };
+    : { href: "/login", label: "Sign in" };
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">

@@ -31,6 +31,7 @@ export interface CreateUserResponse {
   email: string;
   role: UserRole;
   tempPassword: string; // must delete
+  otpCode: string; // must delete
   mustChangePassword: boolean;
   isEmailVerified: boolean;
   isActive: boolean;
