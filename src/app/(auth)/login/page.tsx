@@ -22,7 +22,11 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (status !== "loading" && status !== "unauthenticated") {
+    // Only a fully set-up session leaves the login screen on its own. A
+    // "requires-action" session (an admin-created user mid-setup) must NOT be
+    // bounced away — otherwise a different user could never sign in on this
+    // browser. Post-login routing is handled explicitly in onSubmit below.
+    if (status === "authenticated") {
       router.replace("/dashboard");
     }
   }, [status, router]);
@@ -35,7 +39,18 @@ export default function LoginPage() {
     setInvalidCredentials(false);
     setAuthError(null);
     try {
-      await login(email, password);
+      const action = await login(email, password);
+      // Route explicitly to the next step, carrying the account's email in the
+      // URL so the setup flow is identified by the URL rather than persisted
+      // browser state (which would trap the /login route for other users).
+      const emailParam = `?email=${encodeURIComponent(email)}`;
+      if (action === "VerifyEmail") {
+        router.replace(`/verify-email${emailParam}`);
+      } else if (action === "ChangePassword") {
+        router.replace(`/change-password${emailParam}`);
+      } else {
+        router.replace("/dashboard");
+      }
     } catch (error) {
       if (isApiError(error) && error.status === 401) {
         setInvalidCredentials(true);

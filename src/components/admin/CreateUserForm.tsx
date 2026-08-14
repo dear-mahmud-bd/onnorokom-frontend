@@ -9,6 +9,7 @@ import { isApiError } from "@/lib/api/client";
 import { createUserSchema, type CreateUserInput } from "@/lib/validation";
 import { AdminUserRole, UserRole, type CreateUserResponse } from "@/types";
 import { AdminField } from "@/components/admin/AdminField";
+import { ConfirmByTypingDialog } from "@/components/admin/ConfirmByTypingDialog";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
 
@@ -55,8 +56,67 @@ function CopyValue({ value }: { value: string }) {
   );
 }
 
+function ProvisionedCredentials({
+  created,
+  onDismiss,
+}: {
+  created: CreateUserResponse;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950"
+    >
+      <p className="font-medium text-emerald-800 dark:text-emerald-200">
+        User provisioned
+      </p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-emerald-900 dark:text-emerald-100">
+        <dt className="font-medium">User ID</dt>
+        <dd>{created.userId}</dd>
+        <dt className="font-medium">Email</dt>
+        <dd>{created.email}</dd>
+        <dt className="font-medium">Role</dt>
+        <dd>{ROLE_LABELS[created.role] ?? created.role}</dd>
+        <dt className="font-medium">Temporary password</dt>
+        <dd>
+          <CopyValue value={created.tempPassword} />
+        </dd>
+        <dt className="font-medium">Email OTP</dt>
+        <dd>
+          <CopyValue value={created.otpCode} />
+        </dd>
+        <dt className="font-medium">Must change password</dt>
+        <dd>{created.mustChangePassword ? "Yes" : "No"}</dd>
+        <dt className="font-medium">Email verified</dt>
+        <dd>{created.isEmailVerified ? "Yes" : "No"}</dd>
+        <dt className="font-medium">Active</dt>
+        <dd>{created.isActive ? "Yes" : "No"}</dd>
+      </dl>
+      <p className="text-emerald-700 dark:text-emerald-300">
+        Share the temporary password and email OTP with the user securely.
+        They&apos;ll verify their email with the OTP (valid for 10 minutes), then
+        set a new password on first sign-in. These values won&apos;t be shown
+        again.
+      </p>
+      <div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
+  // Credentials stay hidden until the admin acknowledges the reveal gate.
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
   const [serverError, setServerError] = useState<unknown>(null);
 
   const form = useForm<CreateUserInput>({
@@ -68,11 +128,21 @@ export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
     },
   });
 
+  const dismissCredentials = () => {
+    setCreated(null);
+    setAcknowledged(false);
+    setGateOpen(false);
+  };
+
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null);
     try {
       const response = await createUser(values, sessionTokenProvider);
+      // Hold the credentials but reveal them only after the admin passes the
+      // acknowledgement gate below.
       setCreated(response);
+      setAcknowledged(false);
+      setGateOpen(true);
       form.reset();
       onCreated?.();
     } catch (error) {
@@ -94,42 +164,53 @@ export function CreateUserForm({ onCreated }: { onCreated?: () => void } = {}) {
 
   return (
     <div className="flex flex-col gap-6">
-      {created ? (
+      {created && acknowledged ? (
+        <ProvisionedCredentials created={created} onDismiss={dismissCredentials} />
+      ) : null}
+
+      {created && !acknowledged && !gateOpen ? (
         <div
           role="status"
-          className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm dark:border-emerald-900 dark:bg-emerald-950"
+          className="flex flex-col gap-2 rounded-lg border border-border bg-surface-muted p-4 text-sm"
         >
-          <p className="font-medium text-emerald-800 dark:text-emerald-200">
-            User provisioned
+          <p className="font-medium text-foreground">
+            User created — credentials hidden
           </p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-emerald-900 dark:text-emerald-100">
-            <dt className="font-medium">User ID</dt>
-            <dd>{created.userId}</dd>
-            <dt className="font-medium">Email</dt>
-            <dd>{created.email}</dd>
-            <dt className="font-medium">Role</dt>
-            <dd>{ROLE_LABELS[created.role] ?? created.role}</dd>
-            <dt className="font-medium">Temporary password</dt>
-            <dd>
-              <CopyValue value={created.tempPassword} />
-            </dd>
-            <dt className="font-medium">Email OTP</dt>
-            <dd>
-              <CopyValue value={created.otpCode} />
-            </dd>
-            <dt className="font-medium">Must change password</dt>
-            <dd>{created.mustChangePassword ? "Yes" : "No"}</dd>
-            <dt className="font-medium">Email verified</dt>
-            <dd>{created.isEmailVerified ? "Yes" : "No"}</dd>
-            <dt className="font-medium">Active</dt>
-            <dd>{created.isActive ? "Yes" : "No"}</dd>
-          </dl>
-          <p className="text-emerald-700 dark:text-emerald-300">
-            Share the temporary password and email OTP with the user securely.
-            They&apos;ll verify their email with the OTP, then set a new password
-            on first sign-in. These values won&apos;t be shown again.
+          <p className="text-muted">
+            The temporary password and email OTP are shown only once. Reveal them
+            when you&apos;re ready to hand them over securely.
           </p>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setGateOpen(true)}
+              className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+            >
+              Reveal credentials
+            </button>
+            <button
+              type="button"
+              onClick={dismissCredentials}
+              className="text-xs font-medium text-muted underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
+      ) : null}
+
+      {created && !acknowledged && gateOpen ? (
+        <ConfirmByTypingDialog
+          title="Before you reveal the credentials"
+          message={`This account (${created.email}) must verify its email and change its password within 10 minutes — the one-time code expires. The temporary password and OTP are shown only once, so share them securely.`}
+          confirmWord="confirm"
+          confirmLabel="Reveal credentials"
+          onConfirm={() => {
+            setAcknowledged(true);
+            setGateOpen(false);
+          }}
+          onCancel={() => setGateOpen(false)}
+        />
       ) : null}
 
       <ServerErrorBanner error={serverError} />

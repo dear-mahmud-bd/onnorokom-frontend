@@ -12,9 +12,11 @@ import {
   type VerifyEmailOtpInput,
 } from "@/lib/validation";
 import { normalizeVerifyEmailOtpStatus } from "@/types";
+import { useEmailParam } from "@/lib/auth/useEmailParam";
 import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
 import { FormTextInput } from "@/components/auth/FormTextInput";
 import { SubmitButton } from "@/components/auth/SubmitButton";
+import { SwitchAccountLink } from "@/components/auth/SwitchAccountLink";
 
 export default function VerifyEmailPage() {
   const { status, verifyEmail } = useAuth();
@@ -22,6 +24,8 @@ export default function VerifyEmailPage() {
   const [authError, setAuthError] = useState<unknown>(null);
   const [invalidCode, setInvalidCode] = useState(false);
   const [locked, setLocked] = useState(false);
+  // The account being set up is identified by the URL, not persisted state.
+  const email = useEmailParam();
 
   const form = useForm<VerifyEmailOtpInput>({
     resolver: zodResolver(verifyEmailSchema),
@@ -79,7 +83,18 @@ export default function VerifyEmailPage() {
           Verify your email
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Enter the {OTP_CODE_LENGTH}-digit code we sent to your email.
+          Enter the {OTP_CODE_LENGTH}-digit code we sent to
+          {email ? (
+            <>
+              {" "}
+              <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                {email}
+              </span>
+            </>
+          ) : (
+            " your email"
+          )}
+          .
         </p>
       </div>
 
@@ -117,6 +132,8 @@ export default function VerifyEmailPage() {
           </SubmitButton>
         </form>
       </FormProvider>
+
+      <SwitchAccountLink />
     </div>
   );
 }

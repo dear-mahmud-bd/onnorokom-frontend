@@ -48,7 +48,7 @@ interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
   forceAction: ForceAction | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<ForceAction>;
   logout: () => void;
   refresh: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -104,14 +104,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await loginEndpoint(email, password);
-    saveSession({
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-      forceAction: normalizeForceAction(response.forceAction),
-    });
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string): Promise<ForceAction> => {
+      const response = await loginEndpoint(email, password);
+      const nextForceAction = normalizeForceAction(response.forceAction);
+      saveSession({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        forceAction: nextForceAction,
+      });
+      // Returned so the login page can route explicitly (URL-driven) rather than
+      // depending on the persisted forceAction, which would otherwise trap the
+      // /login route for a mid-setup account.
+      return nextForceAction;
+    },
+    [],
+  );
 
   const doLogout = useCallback(() => {
     clearSession();

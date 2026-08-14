@@ -11,9 +11,11 @@ import {
   type ChangePasswordInput,
 } from "@/lib/validation";
 import { normalizeChangePasswordStatus } from "@/types";
+import { useEmailParam } from "@/lib/auth/useEmailParam";
 import { ServerErrorBanner } from "@/components/auth/ServerErrorBanner";
 import { FormTextInput } from "@/components/auth/FormTextInput";
 import { SubmitButton } from "@/components/auth/SubmitButton";
+import { SwitchAccountLink } from "@/components/auth/SwitchAccountLink";
 
 function readFailedRules(problem: unknown): string[] {
   if (typeof problem !== "object" || problem === null) {
@@ -41,6 +43,8 @@ export default function ChangePasswordPage() {
   const [authError, setAuthError] = useState<unknown>(null);
   const [invalidCurrent, setInvalidCurrent] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
+  // The account being set up is identified by the URL, not persisted state.
+  const email = useEmailParam();
 
   const form = useForm<ChangePasswordInput>({
     resolver: zodResolver(changePasswordSchema),
@@ -125,7 +129,18 @@ export default function ChangePasswordPage() {
           Change your password
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Set a new password to finish securing your account.
+          Set a new password to finish securing
+          {email ? (
+            <>
+              {" "}
+              <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                {email}
+              </span>
+            </>
+          ) : (
+            " your account"
+          )}
+          .
         </p>
       </div>
 
@@ -161,6 +176,8 @@ export default function ChangePasswordPage() {
           </SubmitButton>
         </form>
       </FormProvider>
+
+      <SwitchAccountLink />
     </div>
   );
 }
